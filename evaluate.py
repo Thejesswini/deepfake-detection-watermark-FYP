@@ -23,7 +23,7 @@ def evaluate_model(model, val_loader, device):
     ssim_metric = StructuralSimilarityIndexMeasure(data_range=1.0).to(device)
     extraction_metric = nn.MSELoss()
     
-    
+
     total_psnr = 0.0
     total_ssim = 0.0
     total_watermark_mse = 0.0
@@ -49,14 +49,15 @@ def evaluate_model(model, val_loader, device):
 
             
             corrupted_image = apply_corruptions(embedded_image)
-            corrupted_input_for_inverse = torch.cat([corrupted_image, embedded_watermark_part], dim=1)
+            #corrupted_input_for_inverse = torch.cat([corrupted_image, embedded_watermark_part], dim=1)
+            corrupted_input_for_inverse = torch.cat([corrupted_image, torch.zeros_like(embedded_watermark_part).detach()], dim=1)
             
             recovered = model.inverse(corrupted_input_for_inverse)
             _, recovered_watermark = torch.chunk(recovered, 2, dim=1)
 
             # Calculate and update watermark recovery MSE
             watermark_mse = extraction_metric(recovered_watermark, watermarks)
-            total_watermark_mse += watermark_mse.item()
+            total_watermark_mse += watermark_mse#.item()
             
             print(f"Step [{batch_idx+1}] Embedding -> PSNR: {cur_psnr} | SSIM: {cur_ssim} | Extraction -> Watermark MSE: {watermark_mse}")
 

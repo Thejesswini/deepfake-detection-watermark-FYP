@@ -70,7 +70,7 @@ def show_watermarking_results(model, loader, device, num_images=8):
 
 # Get dataset (keeps original image dimensions now: 218 x 178)
 train_loader, val_loader, test_loader = get_data_loaders(
-    image_directory='/Users/sem5/sem7/deepfake/celebA/img_align_celeba/img_align_celeba',
+    image_directory='./celebA/img_align_celeba/img_align_celeba',
     total_num=1000,
     train_per=0.8,
     val_per=0.1

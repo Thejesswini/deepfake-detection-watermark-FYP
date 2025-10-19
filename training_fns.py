@@ -53,7 +53,8 @@ def training_fn_standard(EPOCHS, model, train_loader, device, criterion1, criter
             #print(f"Epoch [{epoch+1}/{EPOCHS}], Step [{batch_idx+1}/{len(train_loader)}], Total Loss: {loss.item():.6f}")
             if batch_idx % 100 == 0:
                 print(f"Epoch:{epoch} | Imperceptibility: {loss_imperceptibility.item():.6f}, Extraction: {loss_extraction.item():.6f}")
-            
+    torch.save(model.state_dict(), "model_weights.pth")
+
 def training_fn_set_trnfrmd_wtmk_2_0(EPOCHS, model, train_loader, device, criterion1, criterion2, optimizer):
     """
     This function takes the input batches,
@@ -104,4 +105,4 @@ def training_fn_set_trnfrmd_wtmk_2_0(EPOCHS, model, train_loader, device, criter
             #print(f"Epoch [{epoch+1}/{EPOCHS}], Step [{batch_idx+1}/{len(train_loader)}], Total Loss: {loss.item():.6f}")
             if batch_idx % 100 == 0:
                 print(f"Epoch:{epoch} | Imperceptibility: {loss_imperceptibility.item():.6f}, Extraction: {loss_extraction.item():.6f}")
-            
+    torch.save(model.state_dict(), "model_weights.pth")
