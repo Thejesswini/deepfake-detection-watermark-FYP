@@ -25,11 +25,12 @@ class CelebADataset(Dataset):
         return image
 
 
-def get_data_loaders(image_directory, total_num, train_per, val_per):
+def get_data_loaders(image_directory, total_num, train_per, val_per, shuffle=True):
     # List and shuffle images
     all_images = [f for f in os.listdir(image_directory) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
-    random.seed(42)
-    random.shuffle(all_images)
+    if shuffle:
+        random.seed(42)
+        random.shuffle(all_images)
 
     # Split into train/val/test sets
     num_total = total_num
@@ -52,7 +53,7 @@ def get_data_loaders(image_directory, total_num, train_per, val_per):
     test_dataset = CelebADataset(img_dir=image_directory, image_files=test_images, transform=transform)
 
     # Dataloaders
-    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=0)
+    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=shuffle, num_workers=0)
     val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=0)
     test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=0)
 

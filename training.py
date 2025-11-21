@@ -16,7 +16,7 @@ from config import EPOCHS
 from torchmetrics.image import PeakSignalNoiseRatio
 
 
-def show_and_save_watermarking_results(model, loader, device, num_images=30, save_dir="outputs/watermarked"):
+def show_and_save_watermarking_results(model, loader, device, num_images=30, save_dir="outputs/watermarked", start=0):
     """
     Visualizes and saves original, watermarked, and corrupted images side-by-side.
 
@@ -30,13 +30,42 @@ def show_and_save_watermarking_results(model, loader, device, num_images=30, sav
     model.eval()
     os.makedirs(save_dir, exist_ok=True)
 
-    # Take one batch
     data_iter = iter(loader)
+    while start >= 32:
+        next(data_iter)
+        start -= 32
+
+    # fetch the batch that contains the starting point
     images = next(data_iter)
 
-    num_images = min(num_images, images.size(0))
-    original_images = images[:num_images].to(device)
+    result = []
 
+    # Take from current batch
+    NUM_IMAGES = num_images
+    take = min(num_images, images.size(0) - start)
+    result.append(images[start : start + take])
+    num_images -= take
+
+    # If more images needed, continue taking from next batches
+    while num_images > 0:
+        images = next(data_iter)
+        take = min(num_images, images.size(0))
+        result.append(images[:take])
+        num_images -= take
+
+    # Final tensor
+    original_images = torch.cat(result, dim=0).to(device)
+
+    # code to check if the images are in sequence
+    # import matplotlib.pyplot as plt
+
+    # for i in range(3):
+    #     img = original_images[i].permute(1, 2, 0).cpu().numpy()
+    #     plt.imshow(img)
+    #     plt.axis("off")
+    #     plt.show()
+    # return
+    
     # Generate watermark
     watermarks = generate_watermark_matrix(
         batch_size=original_images.size(0),
@@ -57,13 +86,13 @@ def show_and_save_watermarking_results(model, loader, device, num_images=30, sav
 
       # ----- Save only watermarked images -----
     for idx, img in enumerate(embedded_images):
-        save_path = os.path.join(save_dir, f"watermarked_{idx+1}.png")
+        save_path = os.path.join(save_dir, f"watermarked_{idx+31}.png")
         utils.save_image(img, save_path)
         print(f"Saved: {save_path}")
 
     # ----- Visualize all images in a grid -----
     all_images = torch.cat([original_images, embedded_images, corrupted_images], dim=0)
-    grid = utils.make_grid(all_images, nrow=num_images, padding=2, normalize=False)
+    grid = utils.make_grid(all_images, nrow=NUM_IMAGES, padding=2, normalize=False)
 
     plt.figure(figsize=(15, 6))
     np_grid = grid.cpu().numpy()
@@ -77,10 +106,11 @@ def show_and_save_watermarking_results(model, loader, device, num_images=30, sav
 
 # Load dataset
 train_loader, val_loader, test_loader = get_data_loaders(
-    image_directory='/Users/sem5/sem7/deepfake/celebA/img_align_celeba/img_align_celeba',
-    total_num=1000,
+    image_directory=r'D:\SSN\DEEPFAKE\code\celebA\img_align_celeba\img_align_celeba',
+    total_num=200,
     train_per=0.8,
-    val_per=0.1
+    val_per=0.1,
+    shuffle=False
 )
 
 # Device
@@ -94,7 +124,7 @@ optimizer = optim.Adam(model.parameters(), lr=1e-4)
 
 # Loss + metric
 psnr_metric = PeakSignalNoiseRatio(data_range=1.0).to(device)
-criterion2 = nn.MSELoss()
+mse = nn.MSELoss()
 '''
 # Train
 training_fn_set_trnfrmd_wtmk_2_0(
@@ -103,7 +133,7 @@ training_fn_set_trnfrmd_wtmk_2_0(
     train_loader=train_loader,
     optimizer=optimizer,
     criterion1=psnr_metric,
-    criterion2=criterion2,
+    criterion2=mse,
     device=device
 )
 '''
@@ -116,7 +146,7 @@ model.eval()
 print("Training complete.")
 
 # Evaluate
-evaluate_model(model=model, device=device, val_loader=val_loader)
+#evaluate_model(model=model, device=device, val_loader=val_loader)
 
 # Show & save watermarked results
-show_and_save_watermarking_results(model, val_loader, device, num_images=30)
+show_and_save_watermarking_results(model, train_loader, device, num_images=30, start=100)
