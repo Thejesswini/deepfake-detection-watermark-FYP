@@ -1,61 +1,68 @@
+import os
 import torch
 import torch.nn as nn
+import torch.optim as optim
+from torchvision import utils
+import matplotlib.pyplot as plt
+import numpy as np
+
 from revnet_model import RevNet3
 from dataset_prep import get_data_loaders
-import torch.optim as optim
 from watermark_generation import generate_watermark_matrix
 from noise import apply_corruptions
 from evaluate import evaluate_model
-import numpy as np
-from torchvision import utils
-import matplotlib.pyplot as plt
-from config import EPOCHS
 from training_fns import training_fn_set_trnfrmd_wtmk_2_0
+from config import EPOCHS
 from torchmetrics.image import PeakSignalNoiseRatio
 
 
-def show_watermarking_results(model, loader, device, num_images=8):
+def show_and_save_watermarking_results(model, loader, device, num_images=30, save_dir="outputs/watermarked"):
     """
-    Visualizes the output of the watermarking process on a batch of images.
+    Visualizes and saves original, watermarked, and corrupted images side-by-side.
 
     Args:
-        model (nn.Module): The trained RevNet model.
-        loader (DataLoader): The DataLoader for the test or validation set.
-        device (torch.device): The device to run on ('cuda' or 'cpu').
-        num_images (int): The number of images to display from the batch.
+        model (nn.Module): Trained RevNet model.
+        loader (DataLoader): DataLoader for validation/test set.
+        device (torch.device): CPU or CUDA.
+        num_images (int): Number of images to process.
+        save_dir (str): Directory to save images.
     """
     model.eval()
+    os.makedirs(save_dir, exist_ok=True)
 
     # Take one batch
     data_iter = iter(loader)
     images = next(data_iter)
 
-    # Restrict to requested number
     num_images = min(num_images, images.size(0))
     original_images = images[:num_images].to(device)
 
-    # Generate watermark with same H, W as images
+    # Generate watermark
     watermarks = generate_watermark_matrix(
         batch_size=original_images.size(0),
         height=original_images.size(2),
         width=original_images.size(3)
     ).to(device)
 
-    # Concatenate original image + watermark
+    # Concatenate original + watermark
     input_tensor = torch.cat([original_images, watermarks], dim=1)
 
     with torch.no_grad():
-        # 1. Embed the watermark
+        # Embed watermark
         embedded = model(input_tensor)
         embedded_images, _ = torch.chunk(embedded, 2, dim=1)
 
-        # 2. Apply corruption
+        # Apply corruption
         corrupted_images = apply_corruptions(embedded_images)
 
-    # Stack all sets for visualization
-    all_images = torch.cat([original_images, embedded_images, corrupted_images], dim=0)
+      # ----- Save only watermarked images -----
+    for idx, img in enumerate(embedded_images):
+        save_path = os.path.join(save_dir, f"watermarked_{idx+1}.png")
+        utils.save_image(img, save_path)
+        print(f"Saved: {save_path}")
 
-    # Build grid
+    # ----- Visualize all images in a grid -----
+    all_images = torch.cat([original_images, embedded_images, corrupted_images], dim=0)
     grid = utils.make_grid(all_images, nrow=num_images, padding=2, normalize=False)
 
     plt.figure(figsize=(15, 6))
@@ -68,9 +75,9 @@ def show_watermarking_results(model, loader, device, num_images=8):
 
 # ================== MAIN TRAINING ==================
 
-# Get dataset (keeps original image dimensions now: 218 x 178)
+# Load dataset
 train_loader, val_loader, test_loader = get_data_loaders(
-    image_directory='./celebA/img_align_celeba/img_align_celeba',
+    image_directory='/Users/sem5/sem7/deepfake/celebA/img_align_celeba/img_align_celeba',
     total_num=1000,
     train_per=0.8,
     val_per=0.1
@@ -79,17 +86,17 @@ train_loader, val_loader, test_loader = get_data_loaders(
 # Device
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-# Model (3 channels RGB + 3 watermark channels)
+# Model
 model = RevNet3(channels=6).to(device)
 
 # Optimizer
 optimizer = optim.Adam(model.parameters(), lr=1e-4)
 
-# Loss + metrics
+# Loss + metric
 psnr_metric = PeakSignalNoiseRatio(data_range=1.0).to(device)
 criterion2 = nn.MSELoss()
-
-# Training
+'''
+# Train
 training_fn_set_trnfrmd_wtmk_2_0(
     EPOCHS,
     model=model,
@@ -99,11 +106,17 @@ training_fn_set_trnfrmd_wtmk_2_0(
     criterion2=criterion2,
     device=device
 )
+'''
+
+# Load trained model weights
+model.load_state_dict(torch.load("model_weights.pth", map_location=device))
+model.eval()
+
 
 print("Training complete.")
 
 # Evaluate
 evaluate_model(model=model, device=device, val_loader=val_loader)
 
-# Show results
-show_watermarking_results(model, val_loader, device, num_images=8)
+# Show & save watermarked results
+show_and_save_watermarking_results(model, val_loader, device, num_images=30)
