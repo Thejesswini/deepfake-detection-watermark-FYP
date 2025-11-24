@@ -89,8 +89,5 @@ if __name__=='__main__':
     sources = [i for i,j in swaps]
     targets = [j for i,j in swaps]
     
-    sources = [29]
-    target = [44]
     for source, target in swaps:
         inswapper_128(path=f".\\outputs\\watermarked\\watermarked_", sources=sources, targets=targets)
-        break

@@ -86,7 +86,7 @@ def show_and_save_watermarking_results(model, loader, device, num_images=30, sav
 
       # ----- Save only watermarked images -----
     for idx, img in enumerate(embedded_images):
-        save_path = os.path.join(save_dir, f"watermarked_{idx+31}.png")
+        save_path = os.path.join(save_dir, f"watermarked_{idx+61}.png")
         utils.save_image(img, save_path)
         print(f"Saved: {save_path}")
 
@@ -149,4 +149,4 @@ print("Training complete.")
 #evaluate_model(model=model, device=device, val_loader=val_loader)
 
 # Show & save watermarked results
-show_and_save_watermarking_results(model, train_loader, device, num_images=30, start=100)
+show_and_save_watermarking_results(model, train_loader, device, num_images=6, start=130)
