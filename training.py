@@ -11,7 +11,7 @@ from dataset_prep import get_data_loaders
 from watermark_generation import generate_watermark_matrix
 from noise import apply_corruptions
 from evaluate import evaluate_model
-from training_fns import training_fn_set_trnfrmd_wtmk_2_0
+from training_fns import training_fn_set_trnfrmd_wtmk_2_0_sanity_check
 from config import EPOCHS
 from torchmetrics.image import PeakSignalNoiseRatio
 
@@ -107,9 +107,9 @@ def show_and_save_watermarking_results(model, loader, device, num_images=30, sav
 # Load dataset
 train_loader, val_loader, test_loader = get_data_loaders(
     image_directory=r'D:\SSN\DEEPFAKE\code\celebA\img_align_celeba\img_align_celeba',
-    total_num=200,
+    total_num=640,
     train_per=0.8,
-    val_per=0.1,
+    val_per=0.2,
     shuffle=False
 )
 
@@ -125,10 +125,10 @@ optimizer = optim.Adam(model.parameters(), lr=1e-4)
 # Loss + metric
 psnr_metric = PeakSignalNoiseRatio(data_range=1.0).to(device)
 mse = nn.MSELoss()
-'''
+
 # Train
-training_fn_set_trnfrmd_wtmk_2_0(
-    EPOCHS,
+training_fn_set_trnfrmd_wtmk_2_0_sanity_check(
+    100,#EPOCHS,
     model=model,
     train_loader=train_loader,
     optimizer=optimizer,
@@ -136,17 +136,17 @@ training_fn_set_trnfrmd_wtmk_2_0(
     criterion2=mse,
     device=device
 )
-'''
+
 
 # Load trained model weights
-model.load_state_dict(torch.load("model_weights.pth", map_location=device))
-model.eval()
+# model.load_state_dict(torch.load("model_weights_n.pth", map_location=device))
+# model.eval()
 
 
 print("Training complete.")
 
 # Evaluate
-#evaluate_model(model=model, device=device, val_loader=val_loader)
+# evaluate_model(model=model, device=device, val_loader=val_loader)
 
 # Show & save watermarked results
-show_and_save_watermarking_results(model, train_loader, device, num_images=6, start=130)
+#show_and_save_watermarking_results(model, train_loader, device, num_images=6, start=130)

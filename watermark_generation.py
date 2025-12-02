@@ -97,11 +97,42 @@ def peano_curve_generator(height, width, order=3):
     fill(0, 0, height, width, order)
     return mat
 
+def robust_peano_matrix(peano_matrix):
+    # 2. Define how many distinct "levels" you want. 
+    # 16 is a safe number (4 bits of info per pixel).
+    # This creates a "staircase" effect.
+    num_levels = 16 
+    
+    # 3. Quantize the Peano curve into these levels
+    # Normalize to 0-1 first
+    normalized = peano_matrix / peano_matrix.max()
+    
+    # Bucketize into discrete integer levels (0, 1, 2 ... 15)
+    stepped = np.floor(normalized * num_levels)
+    
+    # 4. Scale to 0-1 range for the Tensor
+    # (The model likes 0.0 - 1.0 floats)
+    # The actual values will be: 0.0, 0.066, 0.133... 1.0
+    final_matrix = stepped / (num_levels - 1)
+    
+    return final_matrix
+
 
 def generate_watermark_matrix(batch_size, height, width, order=3):
     peano_matrix = peano_curve_generator(height, width, order)
-    peano_norm = peano_matrix.astype(np.float32) / peano_matrix.max()
-
-    peano_tensor = torch.tensor(peano_norm).unsqueeze(0).repeat(batch_size, 1, 1, 1)  # [B,1,H,W]
+    #peano_norm = peano_matrix.astype(np.float32) / peano_matrix.max()
+    peano_fin = robust_peano_matrix(peano_matrix)
+    
+    peano_tensor = torch.tensor(peano_fin, dtype=torch.float32).unsqueeze(0).repeat(batch_size, 1, 1, 1)  # [B,1,H,W]
     peano_tensor_3c = peano_tensor.repeat(1, 3, 1, 1)  # [B,3,H,W]
     return peano_tensor_3c
+
+if __name__=='__main__':
+    import matplotlib.pyplot as plt
+    
+    pc = robust_peano_matrix(peano_curve_generator(20,20,3))
+    # pc=pc.astype(np.float32) / pc.max()
+    # print(pc*255)
+    
+    plt.imshow(pc, cmap='gray')
+    plt.show()

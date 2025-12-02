@@ -4,6 +4,12 @@ import torch
 from watermark_generation import generate_watermark_matrix
 from noise import apply_corruptions
 import torch.nn as nn
+import torch.nn.functional as F
+from torchvision.utils import save_image
+from torchvision import transforms
+from PIL import Image
+import matplotlib.pyplot as plt
+import os
 
 def evaluate_model(model, val_loader, device):
     """
@@ -73,3 +79,105 @@ def evaluate_model(model, val_loader, device):
     print("--------------------------\n")
 
     return avg_psnr, avg_ssim, avg_watermark_mse
+
+
+def run_phase1_sanity_check(model, test_image_path, device, epoch_idx):
+    """
+    Runs the 'Save-and-Load' round-trip test to verify the model 
+    can survive 8-bit quantization.
+    
+    Returns:
+        float: The MSE loss between the original and extracted watermark.
+    """
+    model.eval()
+    
+    # --- 1. Preparation ---
+    # Define a temp path for the saved image
+    temp_save_path = "temp_sanity_check.png" 
+    
+    # Load the single test image
+    transform = transforms.Compose([
+        transforms.ToTensor() 
+    ])
+    
+    try:
+        raw_img = Image.open(test_image_path).convert('RGB')
+        img_tensor = transform(raw_img).unsqueeze(0).to(device)
+    except:
+        print("Error: Could not load test image.")
+        return 999.0
+
+    # Generate the ROBUST STEPPED Peano Watermark (Target)
+    # Ensure you are using the 'generate_robust_peano_matrix' function defined earlier!
+    target_watermark = generate_watermark_matrix(1, img_tensor.shape[2], img_tensor.shape[3]).to(device)
+
+    # --- 2. Embedding ---
+    with torch.no_grad():
+        input_tensor = torch.cat([img_tensor, target_watermark], dim=1)
+        embedded_output = model(input_tensor)
+        embedded_image_tensor, _ = torch.chunk(embedded_output, 2, dim=1)
+        
+        # CRITICAL: Clamp to ensure valid pixel range before saving
+        embedded_image_tensor = torch.clamp(embedded_image_tensor, 0, 1)
+
+    # --- 3. The "Real World" Barrier (Save to Disk) ---
+    # This step forces the float32 tensors into int8 (0-255) pixels.
+    # This destroys microscopic information.
+    
+    # save_image(embedded_image_tensor, temp_save_path)
+    
+    # # --- 4. Loading Back ---
+    # # Load the image we just saved
+    # loaded_image = Image.open(temp_save_path).convert('RGB')
+    # loaded_tensor = transform(loaded_image).unsqueeze(0).to(device)
+
+    loaded_tensor = embedded_image_tensor
+    
+    # --- 5. Extraction ---
+    with torch.no_grad():
+        # Feed the LOADED image + Zeros into the inverse model
+        zeros = torch.zeros_like(target_watermark).to(device)
+        extraction_input = torch.cat([loaded_tensor, zeros], dim=1)
+        
+        recovered_output = model.inverse(extraction_input)
+        _, recovered_watermark = torch.chunk(recovered_output, 2, dim=1)
+
+    # --- 6. Metrics & Visualization ---
+    mse_loss = F.mse_loss(recovered_watermark, target_watermark).item()
+    
+    print(f"[Epoch {epoch_idx}] Sanity Check MSE: {mse_loss:.5f}")
+
+    # Plotting
+    # We only plot if the loss is low enough (promising) OR every few epochs
+    if epoch_idx % 10 == 0 or mse_loss < 0.05:
+        fig, axs = plt.subplots(1, 3, figsize=(12, 4))
+        
+        # Original Target
+        target_np = target_watermark.squeeze().permute(1, 2, 0).cpu().numpy()
+        axs[0].imshow(target_np)
+        axs[0].set_title("Target (Stepped Peano)")
+        axs[0].axis('off')
+
+        # Watermarked Image (The one that was saved/loaded)
+        loaded_np = loaded_tensor.squeeze().permute(1, 2, 0).cpu().numpy()
+        axs[1].imshow(loaded_np)
+        axs[1].set_title(f"Saved & Loaded Image\n(Simulated Attack)")
+        axs[1].axis('off')
+
+        # Extracted Watermark
+        extracted_np = recovered_watermark.squeeze().permute(1, 2, 0).cpu().numpy()
+        # Clip it to clean up the visual for the user
+        extracted_np = extracted_np.clip(0, 1) 
+        axs[2].imshow(extracted_np)
+        axs[2].set_title(f"Extracted Result\nMSE: {mse_loss:.4f}")
+        axs[2].axis('off')
+
+        plt.show()
+
+        # --- THE STOP CONDITION ---
+        if mse_loss < 0.02: # 0.02 is a very strong match threshold
+            print("\n✅ STOP CONDITION MET: Watermark is robust against saving/loading.")
+            print("You may proceed to Phase 2.")
+            return True # Signal to stop training
+
+    return False

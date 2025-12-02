@@ -73,7 +73,18 @@ def apply_sharpening(images):
     #print(3)
     return torch.clamp(sharpened_images, 0.0, 1.0)
 
-
+def apply_quantization_noise(images):
+        # 1. Scale to 0-255 (simulating standard image format)
+        images = images * 255.0
+        
+        # 2. Add random uniform noise between -0.5 and 0.5
+        # This simulates the error introduced by rounding to the nearest integer
+        # without breaking the gradient flow (unlike actual rounding).
+        noise = (torch.rand_like(images) - 0.5)
+        images = images + noise
+        
+        # 3. Scale back to 0-1
+        return images / 255.0
 
 def apply_corruptions(images):
     """
@@ -88,9 +99,11 @@ def apply_corruptions(images):
         torch.Tensor: The batch of corrupted images.
     """
     corruption_funcs = [
-        apply_gaussian_noise,
-        apply_jpeg_compression,
-        apply_sharpening
+        # apply_gaussian_noise, #---
+        # apply_jpeg_compression,
+        # apply_sharpening,
+        apply_quantization_noise
+        
     ]
     
     
