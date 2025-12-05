@@ -1,7 +1,7 @@
 # CONFIG
-ORDER = 6       # Hilbert curve order (for 8x8 block, order=3) since we are converting images to 64x64 we are taking order as 6
+ORDER = 6       
 DIMENSIONS = 2  # 2D
 BATCH_SIZE = 32
-W_IMPERCEPTIBILITY = 10.0
-W_EXTRACTION = 1.0
+W_IMPERCEPTIBILITY = 4.0
+W_EXTRACTION = 10.0
 EPOCHS = 20

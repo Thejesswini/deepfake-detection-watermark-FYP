@@ -93,9 +93,9 @@ model = RevNet3(channels=6).to(device)
 optimizer = optim.Adam(model.parameters(), lr=1e-4)
 
 # Loss + metric
-psnr_metric = PeakSignalNoiseRatio(data_range=1.0).to(device)
+psnr_metric = nn.MSELoss()
 criterion2 = nn.MSELoss()
-'''
+
 # Train
 training_fn_set_trnfrmd_wtmk_2_0(
     EPOCHS,
@@ -106,11 +106,11 @@ training_fn_set_trnfrmd_wtmk_2_0(
     criterion2=criterion2,
     device=device
 )
-'''
+
 
 # Load trained model weights
-model.load_state_dict(torch.load("model_weights.pth", map_location=device))
-model.eval()
+#model.load_state_dict(torch.load("model_weights.pth", map_location=device))
+#model.eval()
 
 
 print("Training complete.")

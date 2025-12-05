@@ -97,11 +97,34 @@ def peano_curve_generator(height, width, order=3):
     fill(0, 0, height, width, order)
     return mat
 
+import torch
 
-def generate_watermark_matrix(batch_size, height, width, order=3):
-    peano_matrix = peano_curve_generator(height, width, order)
-    peano_norm = peano_matrix.astype(np.float32) / peano_matrix.max()
 
-    peano_tensor = torch.tensor(peano_norm).unsqueeze(0).repeat(batch_size, 1, 1, 1)  # [B,1,H,W]
-    peano_tensor_3c = peano_tensor.repeat(1, 3, 1, 1)  # [B,3,H,W]
-    return peano_tensor_3c
+def generate_watermark_matrix(batch_size, height, width):
+    """
+    Generates a Random Binary Watermark (RBW) tensor of size [B, 3, H, W].
+    
+    The watermark contains only 0.0 and 1.0 values, making it highly robust against 
+    8-bit quantization during image saving (solving the Pigeonhole Principle issue).
+    The pattern is unique for every call, ensuring security when called inside a training loop.
+
+    Args:
+        batch_size (int): The batch size (B).
+        height (int): The image height (H).
+        width (int): The image width (W).
+        
+    Returns:
+        torch.Tensor: The Random Binary Watermark tensor with shape [B, 3, H, W].
+    """
+    # 1. Create a tensor of random floats between 0 and 1 for the entire batch: [B, 3, H, W]
+    # We generate a unique random pattern across all 3 channels for maximum security.
+    random_floats = torch.rand((batch_size, 3, height, width))
+
+    # 2. Convert to a Random Binary Watermark (RBW)
+    #    - Apply a threshold (0.5) to convert to binary (True/False).
+    #    - Convert the boolean tensor to float (0.0 or 1.0).
+    random_binary_watermark = (random_floats > 0.5).float()
+    
+    # The resulting tensor has values of 0.0 and 1.0, which is suitable for 
+    # concatenation with normalized images (0-1 range).
+    return random_binary_watermark
