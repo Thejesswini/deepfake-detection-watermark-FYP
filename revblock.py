@@ -1,5 +1,6 @@
 import torch.nn as nn
 import torch
+import torch.nn.functional as F
 
 # # RevNet reversible block example
 # class RevBlock(nn.Module):
@@ -30,6 +31,23 @@ import torch
 #         x = torch.cat([x1, x2], dim=1)
 #         return x
 
+class Invertible1x1Conv(nn.Module):
+    def __init__(self, channels):
+        super(Invertible1x1Conv, self).__init__()
+        # Initialize with a random orthogonal matrix for stability
+        w_init = torch.linalg.qr(torch.randn(channels, channels))[0]
+        self.weight = nn.Parameter(w_init)
+    
+    def forward(self, x):
+        # x: [Batch, Channels, H, W]
+        # Use conv2d with 1x1 kernel to perform matrix multiplication on every pixel
+        return F.conv2d(x, self.weight.unsqueeze(2).unsqueeze(3))
+    
+    def inverse(self, y):
+        # Calculate the mathematical inverse of the weight matrix
+        inv_weight = torch.inverse(self.weight)
+        return F.conv2d(y, inv_weight.unsqueeze(2).unsqueeze(3))
+
 class RevBlock(nn.Module):
     def __init__(self, channels):
         super(RevBlock, self).__init__()
@@ -37,7 +55,7 @@ class RevBlock(nn.Module):
         out_channels = channels // 2 # 3
         
         # EXPANSION: Give the model working memory
-        hidden_channels = 64 
+        hidden_channels = 32
 
         self.F = nn.Sequential(
             nn.Conv2d(in_channels, hidden_channels, kernel_size=3, padding=1),

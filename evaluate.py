@@ -181,3 +181,74 @@ def run_phase1_sanity_check(model, test_image_path, device, epoch_idx):
             return True # Signal to stop training
 
     return False
+
+def plot_for_one_img(model, test_image_path, device):
+    model.eval()
+    
+    # Load the single test image
+    transform = transforms.Compose([
+        transforms.ToTensor() 
+    ])
+    
+    try:
+        raw_img = Image.open(test_image_path).convert('RGB')
+        img_tensor = transform(raw_img).unsqueeze(0).to(device)
+    except:
+        print("Error: Could not load test image.")
+        return 999.0
+
+    # Generate the ROBUST STEPPED Peano Watermark (Target)
+    # Ensure you are using the 'generate_robust_peano_matrix' function defined earlier!
+    target_watermark = generate_watermark_matrix(1, img_tensor.shape[2], img_tensor.shape[3]).to(device)
+
+    # --- 2. Embedding ---
+    with torch.no_grad():
+        input_tensor = torch.cat([img_tensor, target_watermark], dim=1)
+        embedded_output = model(input_tensor)
+        embedded_image_tensor, _ = torch.chunk(embedded_output, 2, dim=1)
+        
+        # CRITICAL: Clamp to ensure valid pixel range before saving
+        embedded_image_tensor = torch.clamp(embedded_image_tensor, 0, 1)
+
+        embedded_img_uint8 = (embedded_image_tensor * 255).round()
+        # 3. Convert back to float 0-1 (Simulate loading from disk)
+        loaded_tensor = embedded_img_uint8 / 255.0
+    
+    # --- 5. Extraction ---
+    with torch.no_grad():
+        # Feed the LOADED image + Zeros into the inverse model
+        zeros = torch.zeros_like(target_watermark).to(device)
+        extraction_input = torch.cat([loaded_tensor, zeros], dim=1)
+        
+        recovered_output = model.inverse(extraction_input)
+        _, recovered_watermark = torch.chunk(recovered_output, 2, dim=1)
+
+    # --- 6. Metrics & Visualization ---
+    mse_loss = F.mse_loss(recovered_watermark, target_watermark).item()
+    
+    print(f"Sanity Check MSE: {mse_loss:.5f}")
+
+    # Plotting
+    fig, axs = plt.subplots(1, 3, figsize=(12, 4))
+    
+    # Original Target
+    target_np = target_watermark.squeeze().permute(1, 2, 0).cpu().numpy()
+    axs[0].imshow(target_np)
+    axs[0].set_title("Target (Stepped Peano)")
+    axs[0].axis('off')
+
+    # Watermarked Image (The one that was saved/loaded)
+    loaded_np = loaded_tensor.squeeze().permute(1, 2, 0).cpu().numpy()
+    axs[1].imshow(loaded_np)
+    axs[1].set_title(f"Saved & Loaded Image\n(Simulated Attack)")
+    axs[1].axis('off')
+
+    # Extracted Watermark
+    extracted_np = recovered_watermark.squeeze().permute(1, 2, 0).cpu().numpy()
+    # Clip it to clean up the visual for the user
+    extracted_np = extracted_np.clip(0, 1) 
+    axs[2].imshow(extracted_np)
+    axs[2].set_title(f"Extracted Result\nMSE: {mse_loss:.4f}")
+    axs[2].axis('off')
+
+    plt.show()

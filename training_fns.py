@@ -168,3 +168,85 @@ def training_fn_set_trnfrmd_wtmk_2_0_sanity_check(EPOCHS, model, train_loader, d
                 # Save the "Sanity Proven" model
                 torch.save(model.state_dict(), "phase1_sanity_passed.pth")
                 break # Exit the loop
+
+def training_fn_with_both_criterion_as_mse_and_channel_mixing(EPOCHS, model, train_loader, device, optimizer, criterion):
+    # Use MSE for both checks. It is much more stable.
+    mse_criterion = criterion
+    
+    data_iter = iter(train_loader)
+    first_batch = next(data_iter)
+    # Generate watermark once (fixed for the batch setup)
+    fixed_watermark = generate_watermark_matrix(BATCH_SIZE, first_batch.size(2), first_batch.size(3)).to(device)
+    
+    for epoch in range(EPOCHS):
+        model.train()
+        running_psnr = 0.0
+        running_ext_mse = 0.0
+
+        for batch_idx, images in enumerate(train_loader):
+            images = images.to(device)
+            current_batch_size = images.size(0)
+            
+            # Adjust watermark batch size if last batch is smaller
+            if current_batch_size != BATCH_SIZE:
+                watermarks = fixed_watermark[:current_batch_size]
+            else:
+                watermarks = fixed_watermark
+            
+            # 1. Forward Pass (Embed)
+            input_tensor = torch.cat([images, watermarks], dim=1)
+            embedded_full = model(input_tensor)
+            
+            # The model output is mixed, but we want the first 3 channels to look like the image
+            # Note: Because of Invertible1x1Conv, 'embedded_image' is not strictly separated anymore
+            # But we force the first 3 channels to resemble the image via Loss.
+            embedded_image = embedded_full[:, :3, :, :]
+            
+            # Loss 1: Imperceptibility (Minimize MSE between Input and Embedded)
+            loss_imperceptibility = mse_criterion(embedded_image, images)
+            
+            # 2. Attack Simulation
+            corrupted_image = apply_corruptions(embedded_image)
+            
+            # 3. Inverse Pass (Extract)
+            # Create the "Attack" tensor: [Corrupted Image, Zeros]
+            # This represents losing the watermark data and trying to recover it from the image traces
+            attack_tensor = torch.cat([corrupted_image, torch.zeros_like(watermarks)], dim=1)
+            
+            recovered_full = model.inverse(attack_tensor)
+            recovered_watermark = recovered_full[:, 3:, :, :] # The last 3 channels should be the watermark
+            
+            # Loss 2: Extraction (Minimize MSE between Original Watermark and Recovered)
+            loss_extraction = mse_criterion(recovered_watermark, watermarks)
+            
+            # Total Loss
+            loss = (W_IMPERCEPTIBILITY * loss_imperceptibility) + (W_EXTRACTION * loss_extraction)
+            
+            optimizer.zero_grad()
+            loss.backward()
+            
+            # Clip gradients to prevent explosion (common in RevNets)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            
+            optimizer.step()
+
+            # --- Logging Metrics ---
+            # Calculate PSNR for display only
+            with torch.no_grad():
+                psnr = 10 * torch.log10(1 / loss_imperceptibility)
+                running_psnr += psnr.item()
+                running_ext_mse += loss_extraction.item()
+
+            if batch_idx % 100 == 0:
+                print(f"Epoch:{epoch} | Loss: {loss.item():.4f} | PSNR: {psnr:.2f}dB | Ext_MSE: {loss_extraction.item():.4f}")
+
+        # End of Epoch Sanity Check
+        if epoch % 5 == 0:
+            # You can call your visualization function here
+            print(f"--- Epoch {epoch} Avg PSNR: {running_psnr/len(train_loader):.2f} ---")
+            passed = run_phase1_sanity_check(model, TEST_IMG_PATH, device, epoch)
+            
+            if passed:
+                # Save the "Sanity Proven" model
+                torch.save(model.state_dict(), "channel_mixing_phase1_sanity_passed.pth")
+                break # Exit the loop

@@ -6,12 +6,12 @@ from torchvision import utils
 import matplotlib.pyplot as plt
 import numpy as np
 
-from revnet_model import RevNet3
+from revnet_model import RevNet3_with_ChannelMixing
 from dataset_prep import get_data_loaders
 from watermark_generation import generate_watermark_matrix
 from noise import apply_corruptions
 from evaluate import evaluate_model
-from training_fns import training_fn_set_trnfrmd_wtmk_2_0_sanity_check
+from training_fns import training_fn_with_both_criterion_as_mse_and_channel_mixing
 from config import EPOCHS
 from torchmetrics.image import PeakSignalNoiseRatio
 
@@ -107,7 +107,7 @@ def show_and_save_watermarking_results(model, loader, device, num_images=30, sav
 # Load dataset
 train_loader, val_loader, test_loader = get_data_loaders(
     image_directory=r'D:\SSN\DEEPFAKE\code\celebA\img_align_celeba\img_align_celeba',
-    total_num=640,
+    total_num=1000,
     train_per=0.8,
     val_per=0.2,
     shuffle=False
@@ -117,23 +117,23 @@ train_loader, val_loader, test_loader = get_data_loaders(
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # Model
-model = RevNet3(channels=6).to(device)
+model = RevNet3_with_ChannelMixing(channels=6).to(device)
 
 # Optimizer
-optimizer = optim.Adam(model.parameters(), lr=1e-4)
+optimizer = optim.Adam(model.parameters(), lr=1e-3)#1e-4 for all other training fnss
 
 # Loss + metric
 psnr_metric = PeakSignalNoiseRatio(data_range=1.0).to(device)
 mse = nn.MSELoss()
 
 # Train
-training_fn_set_trnfrmd_wtmk_2_0_sanity_check(
+training_fn_with_both_criterion_as_mse_and_channel_mixing(
     100,#EPOCHS,
     model=model,
     train_loader=train_loader,
     optimizer=optimizer,
-    criterion1=psnr_metric,
-    criterion2=mse,
+    #criterion1=psnr_metric,
+    criterion=mse,
     device=device
 )
 
