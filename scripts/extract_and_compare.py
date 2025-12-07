@@ -10,12 +10,14 @@ import numpy as np
 # --------- CONFIG ----------
 WMARKED_DIR = "outputs/watermarked"     # your saved watermarked images
 DEEPFAKE_DIR = "deepfakes"             # deepfake images
-OUT_DIR = "outputs/extracted_watermarks"
+OUT_DIR = "outputs/extracted_watermarks/deepfake"
+OUT_DI="outputs/extracted_watermarks/original"
 MODEL_PATH = "model_weights.pth"
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 IMAGE_SIZE = (218, 178)
 
 os.makedirs(OUT_DIR, exist_ok=True)
+os.makedirs(OUT_DI, exist_ok=True)
 
 # --------- MODEL ----------
 model = RevNet3(channels=6).to(DEVICE)
@@ -72,7 +74,12 @@ for fname in os.listdir(WMARKED_DIR):
     mse, psnr = compare_watermarks(extracted_wm, orig_wm)
     print(f"{fname}: MSE={mse:.6f}, PSNR={psnr:.2f} dB")
 
-    # Save extracted watermark
+    # Save extracted watermark -  deepfakes 
     save_path = os.path.join(OUT_DIR, f"{fname}_wm.png")
     save_image(extracted_wm, save_path)
-    print(f"Saved extracted watermark: {save_path}")
+    print(f"Saved extracted watermark deepfake : {save_path}")
+    
+    # Save extracted watermark - orignal
+    save_path = os.path.join(OUT_DI, f"{fname}_wm.png")
+    save_image(orig_wm, save_path)
+    print(f"Saved extracted watermark original: {save_path}")
