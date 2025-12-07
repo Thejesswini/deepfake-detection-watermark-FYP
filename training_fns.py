@@ -2,7 +2,7 @@ import torch
 from watermark_generation import generate_watermark_matrix
 from noise import apply_corruptions
 from config import W_EXTRACTION, W_IMPERCEPTIBILITY, BATCH_SIZE
-from evaluate import run_phase1_sanity_check
+from evaluate import run_phase1_sanity_check, plot_for_one_img
 
 # NOTE: CHANGE THE WAY LOSS IS PRINTED DURING TRAINING!!!
 TEST_IMG_PATH = r"D:\SSN\DEEPFAKE\code\celebA\img_align_celeba\img_align_celeba\000002.jpg"
@@ -250,3 +250,77 @@ def training_fn_with_both_criterion_as_mse_and_channel_mixing(EPOCHS, model, tra
                 # Save the "Sanity Proven" model
                 torch.save(model.state_dict(), "channel_mixing_phase1_sanity_passed.pth")
                 break # Exit the loop
+
+import torch.optim as optim
+
+def training_fn_refined(EPOCHS, model, train_loader, device, criterion, optimizer):
+    # 1. Use MSE for both.
+    mse_criterion = criterion     
+    
+    # 3. Setup Optimizer and Scheduler
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5, verbose=True)
+
+    data_iter = iter(train_loader)
+    first_batch = next(data_iter)
+    fixed_watermark = generate_watermark_matrix(BATCH_SIZE, first_batch.size(2), first_batch.size(3)).to(device)
+    
+    print("--- Starting Extended Training ---")
+    
+    for epoch in range(EPOCHS):
+        model.train()
+        running_loss = 0.0
+        
+        for batch_idx, images in enumerate(train_loader):
+            images = images.to(device)
+            current_batch_size = images.size(0)
+            
+            if current_batch_size != BATCH_SIZE:
+                watermarks = fixed_watermark[:current_batch_size]
+            else:
+                watermarks = fixed_watermark
+            
+            # --- Forward ---
+            input_tensor = torch.cat([images, watermarks], dim=1)
+            embedded_full = model(input_tensor)
+            embedded_image = embedded_full[:, :3, :, :]
+            
+            loss_imperceptibility = mse_criterion(embedded_image, images)
+            
+            # --- Attack & Inverse ---
+            # IMPORTANT: We use .detach() on the noise to simulate a real attack 
+            # where the gradients of the noise don't matter, only the pixel values.
+            corrupted_image = apply_corruptions(embedded_image) 
+            
+            # Input to inverse: Corrupted Image + ZEROS
+            attack_tensor = torch.cat([corrupted_image, torch.zeros_like(watermarks)], dim=1)
+            
+            recovered_full = model.inverse(attack_tensor)
+            recovered_watermark = recovered_full[:, 3:, :, :]
+            
+            loss_extraction = mse_criterion(recovered_watermark, watermarks)
+            
+            # --- Optimization ---
+            loss = (W_IMPERCEPTIBILITY * loss_imperceptibility) + (W_EXTRACTION * loss_extraction)
+            
+            optimizer.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            optimizer.step()
+            
+            running_loss += loss.item()
+
+        # Update Learning Rate based on loss
+        avg_loss = running_loss / len(train_loader)
+        scheduler.step(avg_loss)
+
+        # Logging
+        with torch.no_grad():
+            psnr = 10 * torch.log10(1 / loss_imperceptibility)
+        
+        print(f"Epoch: {epoch+1} | Loss: {avg_loss:.6f} | PSNR: {psnr:.2f}dB | Ext_MSE: {loss_extraction.item():.6f}")
+
+        if ((epoch + 1) % 10 == 0):
+            plot_for_one_img(model, test_image_path=TEST_IMG_PATH, device=device)
+        # Save Checkpoint every 20 epochs
+        if (epoch + 1) % 20 == 0:
+            torch.save(model.state_dict(), f"revnet_checkpoint_{epoch+1}.pth")
