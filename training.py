@@ -11,12 +11,12 @@ from dataset_prep import get_data_loaders
 from watermark_generation import generate_watermark_matrix
 from noise import apply_corruptions
 from evaluate import evaluate_model
-from training_fns import training_fn_with_both_criterion_as_mse_and_channel_mixing
+from training_fns import training_fn_refined
 from config import EPOCHS
 from torchmetrics.image import PeakSignalNoiseRatio
 
 
-def show_and_save_watermarking_results(model, loader, device, num_images=30, save_dir="outputs/watermarked", start=0):
+def show_and_save_watermarking_results(model, loader, device, num_images=30, save_dir="watermarked_RevNet2ChannelMixing", start=0):
     """
     Visualizes and saves original, watermarked, and corrupted images side-by-side.
 
@@ -80,28 +80,64 @@ def show_and_save_watermarking_results(model, loader, device, num_images=30, sav
         # Embed watermark
         embedded = model(input_tensor)
         embedded_images, _ = torch.chunk(embedded, 2, dim=1)
+        
+        embedded_images = torch.clamp(embedded_images, 0, 1) # for rounding off to simulate saving
 
-        # Apply corruption
-        corrupted_images = apply_corruptions(embedded_images)
+        # # Apply corruption
+        # corrupted_images = apply_corruptions(embedded_images)
 
       # ----- Save only watermarked images -----
     for idx, img in enumerate(embedded_images):
-        save_path = os.path.join(save_dir, f"watermarked_{idx+61}.png")
+        save_path = os.path.join(save_dir, f"watermarked_{idx+1:06d}.png")
         utils.save_image(img, save_path)
         print(f"Saved: {save_path}")
 
     # ----- Visualize all images in a grid -----
-    all_images = torch.cat([original_images, embedded_images, corrupted_images], dim=0)
-    grid = utils.make_grid(all_images, nrow=NUM_IMAGES, padding=2, normalize=False)
+    # all_images = torch.cat([original_images, embedded_images, corrupted_images], dim=0)
+    # grid = utils.make_grid(all_images, nrow=NUM_IMAGES, padding=2, normalize=False)
 
-    plt.figure(figsize=(15, 6))
-    np_grid = grid.cpu().numpy()
-    plt.imshow(np.transpose(np_grid, (1, 2, 0)))
-    plt.title('Top: Original | Middle: Watermarked | Bottom: Corrupted', fontsize=16)
-    plt.axis('off')
+    # plt.figure(figsize=(15, 6))
+    # np_grid = grid.cpu().numpy()
+    # plt.imshow(np.transpose(np_grid, (1, 2, 0)))
+    # plt.title('Top: Original | Middle: Watermarked | Bottom: Corrupted', fontsize=16)
+    # plt.axis('off')
+    # plt.show()
+
+def visualize_single_batch(model, loader, device):
+    """
+    Quick helper to see if things look right. 
+    Does NOT save to disk.
+    """
+    model.eval()
+    images = next(iter(loader)) # Just take first batch
+    images = images.to(device)
+    
+    watermarks = generate_watermark_matrix(images.size(0), images.size(2), images.size(3)).to(device)
+    
+    with torch.no_grad():
+        embedded = model(torch.cat([images, watermarks], dim=1))
+        emb_img, _ = torch.chunk(embedded, 2, dim=1)
+        
+        # ROUNDING SIMULATION FOR VISUALIZATION
+        # Convert to 0-255 int and back to 0-1 float to see the "Saved" quality
+        emb_img = (emb_img * 255).round() / 255.0
+        
+        # Difference Map (To see where watermark is hiding)
+        diff = torch.abs(emb_img - images) * 10 # Amplify diff by 10x to see it
+        
+    # Plot first 4
+    fig, axs = plt.subplots(4, 3, figsize=(10, 12))
+    for i in range(4):
+        axs[i,0].imshow(images[i].permute(1,2,0).cpu())
+        axs[i,0].set_title("Original")
+        axs[i,1].imshow(emb_img[i].permute(1,2,0).cpu())
+        axs[i,1].set_title("Watermarked (Rounded)")
+        axs[i,2].imshow(diff[i].permute(1,2,0).cpu(), cmap='hot')
+        axs[i,2].set_title("Diff x10")
+        for ax in axs[i]: ax.axis('off')
+    plt.tight_layout()
     plt.show()
-
-
+    
 # ================== MAIN TRAINING ==================
 
 # Load dataset
@@ -127,20 +163,20 @@ psnr_metric = PeakSignalNoiseRatio(data_range=1.0).to(device)
 mse = nn.MSELoss()
 
 # Train
-training_fn_with_both_criterion_as_mse_and_channel_mixing(
-    100,#EPOCHS,
-    model=model,
-    train_loader=train_loader,
-    optimizer=optimizer,
-    #criterion1=psnr_metric,
-    criterion=mse,
-    device=device
-)
+# training_fn_refined(
+#     100,#EPOCHS,
+#     model=model,
+#     train_loader=train_loader,
+#     optimizer=optimizer,
+#     #criterion1=psnr_metric,
+#     criterion=mse,
+#     device=device
+# )
 
 
 # Load trained model weights
-# model.load_state_dict(torch.load("model_weights_n.pth", map_location=device))
-# model.eval()
+model.load_state_dict(torch.load(r"D:\SSN\DEEPFAKE\code\revnet2_ChannelMixing_metrics\revnet_checkpoint_100.pth", map_location=device))
+model.eval()
 
 
 print("Training complete.")
@@ -149,4 +185,5 @@ print("Training complete.")
 # evaluate_model(model=model, device=device, val_loader=val_loader)
 
 # Show & save watermarked results
-#show_and_save_watermarking_results(model, train_loader, device, num_images=6, start=130)
+# show_and_save_watermarking_results(model, train_loader, device, num_images=50)
+# visualize_single_batch(model, train_loader, device)

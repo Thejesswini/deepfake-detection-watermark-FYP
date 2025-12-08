@@ -55,7 +55,7 @@ class RevBlock(nn.Module):
         out_channels = channels // 2 # 3
         
         # EXPANSION: Give the model working memory
-        hidden_channels = 32
+        hidden_channels = 64
 
         self.F = nn.Sequential(
             nn.Conv2d(in_channels, hidden_channels, kernel_size=3, padding=1),

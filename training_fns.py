@@ -258,7 +258,7 @@ def training_fn_refined(EPOCHS, model, train_loader, device, criterion, optimize
     mse_criterion = criterion     
     
     # 3. Setup Optimizer and Scheduler
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5, verbose=True)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5)
 
     data_iter = iter(train_loader)
     first_batch = next(data_iter)
@@ -287,8 +287,6 @@ def training_fn_refined(EPOCHS, model, train_loader, device, criterion, optimize
             loss_imperceptibility = mse_criterion(embedded_image, images)
             
             # --- Attack & Inverse ---
-            # IMPORTANT: We use .detach() on the noise to simulate a real attack 
-            # where the gradients of the noise don't matter, only the pixel values.
             corrupted_image = apply_corruptions(embedded_image) 
             
             # Input to inverse: Corrupted Image + ZEROS

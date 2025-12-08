@@ -49,6 +49,33 @@ def apply_jpeg_compression(images):
     
     return torch.stack(compressed_images).to(images.device)
 
+import torch.nn.functional as F
+
+def apply_diff_jpeg_approximation(images):
+    """
+    Differentiable approximation of JPEG:
+    1. Downscales the image (loss of detail).
+    2. Adds quantization noise (rounding error).
+    3. Upscales it back (blurriness).
+    """
+    # Randomly choose a "quality" factor (scale)
+    # Lower scale = Lower quality (more pixelated)
+    scale = random.uniform(0.5, 0.9) 
+    
+    # 1. Downsample (Loss of high-frequency info)
+    # mode='area' or 'bilinear' creates gradients
+    small_images = F.interpolate(images, scale_factor=scale, mode='bilinear', align_corners=False)
+    
+    # 2. Add Quantization Noise (Simulate 8-bit rounding loss)
+    # We add noise to the small image before resizing back
+    noise = (torch.rand_like(small_images) - 0.5) / 255.0
+    small_images = small_images + noise
+    
+    # 3. Upsample back to original size
+    restored_images = F.interpolate(small_images, size=(images.shape[2], images.shape[3]), mode='bilinear', align_corners=False)
+    
+    return torch.clamp(restored_images, 0.0, 1.0)
+
 # Helper Function 3: Sharpening Filter
 def apply_sharpening(images):
     """Applies a sharpening kernel to a batch of images."""
@@ -99,11 +126,11 @@ def apply_corruptions(images):
         torch.Tensor: The batch of corrupted images.
     """
     corruption_funcs = [
-        # apply_gaussian_noise, #---
+        apply_gaussian_noise, #---
         # apply_jpeg_compression,
-        # apply_sharpening,
-        apply_quantization_noise
-        
+        apply_sharpening,
+        apply_quantization_noise,
+        apply_diff_jpeg_approximation
     ]
     
     
