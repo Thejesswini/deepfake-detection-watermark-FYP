@@ -1,4 +1,4 @@
-from revblock import RevBlock, Invertible1x1Conv
+from revblock import RevBlock, Invertible1x1Conv, RevBlockTanh
 import torch.nn as nn
 
 class RevNet(nn.Module):
@@ -48,6 +48,35 @@ class RevNet3_with_ChannelMixing(nn.Module):
         # 2. Mix again between blocks (Optional but recommended)
         self.mix2 = Invertible1x1Conv(channels)
         self.revblock2 = RevBlock(channels)
+
+    def forward(self, x):
+        x = self.mix1(x)
+        x = self.revblock1(x)
+        
+        x = self.mix2(x)
+        x = self.revblock2(x)
+        return x 
+
+    def inverse(self, y):
+        # Exact reverse order
+        y = self.revblock2.inverse(y)
+        y = self.mix2.inverse(y)
+        
+        y = self.revblock1.inverse(y)
+        y = self.mix1.inverse(y)
+        return y
+    
+class RevNet3_with_ChannelMixing_Tanh(nn.Module):
+    def __init__(self, channels=6):  # 3 Image + 3 Watermark
+        super().__init__()
+        
+        # 1. Mix channels immediately so image and watermark are inseparable
+        self.mix1 = Invertible1x1Conv(channels)
+        self.revblock1 = RevBlockTanh(channels)
+        
+        # 2. Mix again between blocks (Optional but recommended)
+        self.mix2 = Invertible1x1Conv(channels)
+        self.revblock2 = RevBlockTanh(channels)
 
     def forward(self, x):
         x = self.mix1(x)

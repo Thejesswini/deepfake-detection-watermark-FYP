@@ -322,3 +322,88 @@ def training_fn_refined(EPOCHS, model, train_loader, device, criterion, optimize
         # Save Checkpoint every 20 epochs
         if (epoch + 1) % 20 == 0:
             torch.save(model.state_dict(), f"revnet_checkpoint_{epoch+1}.pth")
+            
+def training_fn_refined_weighted_mse(EPOCHS, model, train_loader, device, criterion, optimizer):
+    # 1. Use MSE for both.
+    mse_criterion = criterion    
+    
+    weights = torch.tensor([1.0, 2.0, 0.5]).view(1, 3, 1, 1).to(device)
+
+    def weighted_mse_loss(input, target, weights):
+        diff = (input - target) ** 2
+        weighted_diff = diff * weights
+        return weighted_diff.mean() 
+    
+    # 3. Setup Optimizer and Scheduler
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5)
+
+    data_iter = iter(train_loader)
+    first_batch = next(data_iter)
+    fixed_watermark = generate_watermark_matrix(BATCH_SIZE, first_batch.size(2), first_batch.size(3)).to(device)
+    
+    print("--- Starting Extended Training ---")
+    
+    for epoch in range(EPOCHS):
+        # Dynamic weighting
+        # if epoch < 20:
+        #     W_IMPERCEPTIBILITY = 1.0  # Let it learn the mechanism
+        # elif epoch < 60:
+        #     W_IMPERCEPTIBILITY = 10.0 # Force it to clean up
+        # else:
+        #     W_IMPERCEPTIBILITY = 50.0
+        model.train()
+        running_loss = 0.0
+        
+        for batch_idx, images in enumerate(train_loader):
+            images = images.to(device)
+            current_batch_size = images.size(0)
+            
+            if current_batch_size != BATCH_SIZE:
+                watermarks = fixed_watermark[:current_batch_size]
+            else:
+                watermarks = fixed_watermark
+            
+            # --- Forward ---
+            input_tensor = torch.cat([images, watermarks], dim=1)
+            embedded_full = model(input_tensor)
+            embedded_image = embedded_full[:, :3, :, :]
+            
+            #loss_imperceptibility = weighted_mse_loss(embedded_image, images, weights)
+            loss_imperceptibility = mse_criterion(embedded_image, images)
+            
+            # --- Attack & Inverse ---
+            corrupted_image = apply_corruptions(embedded_image) 
+            
+            # Input to inverse: Corrupted Image + ZEROS
+            attack_tensor = torch.cat([corrupted_image, torch.zeros_like(watermarks)], dim=1)
+            
+            recovered_full = model.inverse(attack_tensor)
+            recovered_watermark = recovered_full[:, 3:, :, :]
+            
+            loss_extraction = mse_criterion(recovered_watermark, watermarks)
+            
+            # --- Optimization ---
+            loss = (W_IMPERCEPTIBILITY * loss_imperceptibility) + (W_EXTRACTION * loss_extraction)
+            
+            optimizer.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            optimizer.step()
+            
+            running_loss += loss.item()
+
+        # Update Learning Rate based on loss
+        avg_loss = running_loss / len(train_loader)
+        scheduler.step(avg_loss)
+
+        # Logging
+        with torch.no_grad():
+            psnr = 10 * torch.log10(1 / loss_imperceptibility)
+        
+        print(f"Epoch: {epoch+1} | Loss: {avg_loss:.6f} | PSNR: {psnr:.2f}dB | Ext_MSE: {loss_extraction.item():.6f}")
+
+        if ((epoch + 1) % 10 == 0):
+            plot_for_one_img(model, test_image_path=TEST_IMG_PATH, device=device)
+        # Save Checkpoint every 20 epochs
+        if (epoch + 1) % 20 == 0:
+            torch.save(model.state_dict(), f"revnet_checkpoint_{epoch+1}.pth")
