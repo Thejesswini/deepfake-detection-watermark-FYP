@@ -83,9 +83,10 @@ def apply_sharpening(images):
     
     # Define a classic 3x3 sharpening kernel
     kernel_base = torch.tensor([[0, -1, 0], [-1, 5, -1], [0, -1, 0]], dtype=torch.float32)
+    # New (Aggressive Sharpening)
+    # kernel_base = torch.tensor([[-1, -1, -1], [-1, 9, -1], [-1, -1, -1]], dtype=torch.float32)
     
     kernel = kernel_base.view(1, 1, 3, 3).repeat(num_channels, 1, 1, 1)
-    
     
     kernel = kernel.to(images.device)
     

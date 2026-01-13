@@ -6,17 +6,17 @@ from torchvision import utils
 import matplotlib.pyplot as plt
 import numpy as np
 
-from revnet_model import RevNet3_with_ChannelMixing_Tanh
+from revnet_model import RevNet3_with_ChannelMixing_Tanh_Deep
 from dataset_prep import get_data_loaders
 from watermark_generation import generate_watermark_matrix
 from noise import apply_corruptions
-from evaluate import evaluate_model
+from evaluate import evaluate_model, plot_for_one_img
 from training_fns import training_fn_refined_weighted_mse
 from config import EPOCHS
 from torchmetrics.image import PeakSignalNoiseRatio
 
 
-def show_and_save_watermarking_results(model, loader, device, num_images=30, save_dir="watermarked_RevNet2ChannelMixing", start=0):
+def show_and_save_watermarking_results(model, loader, device, num_images=30, save_dir="watermarked_RevNet_Deep", start=0):
     """
     Visualizes and saves original, watermarked, and corrupted images side-by-side.
 
@@ -153,7 +153,7 @@ train_loader, val_loader, test_loader = get_data_loaders(
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # Model
-model = RevNet3_with_ChannelMixing_Tanh(channels=6).to(device)
+model = RevNet3_with_ChannelMixing_Tanh_Deep(channels=6).to(device)
 
 # Optimizer
 optimizer = optim.Adam(model.parameters(), lr=1e-3)#1e-4 for all other training fnss
@@ -163,27 +163,28 @@ psnr_metric = PeakSignalNoiseRatio(data_range=1.0).to(device)
 mse = nn.MSELoss()
 
 # Train
-training_fn_refined_weighted_mse(
-    100,#EPOCHS,
-    model=model,
-    train_loader=train_loader,
-    optimizer=optimizer,
-    #criterion1=psnr_metric,
-    criterion=mse,
-    device=device
-)
+# training_fn_refined_weighted_mse(
+#     100,#EPOCHS,
+#     model=model,
+#     train_loader=train_loader,
+#     optimizer=optimizer,
+#     #criterion1=psnr_metric,
+#     criterion=mse,
+#     device=device
+# )
 
 
 # Load trained model weights
-# model.load_state_dict(torch.load(r"D:\SSN\DEEPFAKE\code\revnet2_ChannelMixing_metrics\revnet_checkpoint_100.pth", map_location=device))
-# model.eval()
+model.load_state_dict(torch.load(r"D:\SSN\DEEPFAKE\code\revnet_Deep\revnet_checkpoint_100.pth", map_location=device))
+model.eval()
 
 
 print("Training complete.")
 
 # Evaluate
-evaluate_model(model=model, device=device, val_loader=val_loader)
+# evaluate_model(model=model, device=device, val_loader=val_loader)
 
 # Show & save watermarked results
-# show_and_save_watermarking_results(model, train_loader, device, num_images=50)
+show_and_save_watermarking_results(model, train_loader, device, num_images=50)
+plot_for_one_img(model, test_image_path=r'D:\SSN\DEEPFAKE\code\celebA\img_align_celeba\img_align_celeba\000001.jpg', device=device)
 # visualize_single_batch(model, train_loader, device)

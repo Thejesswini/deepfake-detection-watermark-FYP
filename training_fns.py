@@ -124,6 +124,7 @@ def training_fn_set_trnfrmd_wtmk_2_0_sanity_check(EPOCHS, model, train_loader, d
     first_batch = next(data_iter)
     watermarks = generate_watermark_matrix(BATCH_SIZE, first_batch.size(2),first_batch.size(3)).to(device) #assuming that the length and width are same
     
+    print("--- training_fn_set_trnfrmd_wtmk_2_0_sanity_check ---")
     for epoch in range(EPOCHS):
         model.train()
         for batch_idx, images in enumerate(train_loader):
@@ -170,6 +171,7 @@ def training_fn_set_trnfrmd_wtmk_2_0_sanity_check(EPOCHS, model, train_loader, d
                 break # Exit the loop
 
 def training_fn_with_both_criterion_as_mse_and_channel_mixing(EPOCHS, model, train_loader, device, optimizer, criterion):
+    print("--- training_fn_with_both_criterion_as_mse_and_channel_mixing --")
     # Use MSE for both checks. It is much more stable.
     mse_criterion = criterion
     
@@ -254,6 +256,7 @@ def training_fn_with_both_criterion_as_mse_and_channel_mixing(EPOCHS, model, tra
 import torch.optim as optim
 
 def training_fn_refined(EPOCHS, model, train_loader, device, criterion, optimizer):
+    # better version of training_fn_with_both_criterion_as_mse_and_channel_mixing
     # 1. Use MSE for both.
     mse_criterion = criterion     
     
@@ -264,7 +267,7 @@ def training_fn_refined(EPOCHS, model, train_loader, device, criterion, optimize
     first_batch = next(data_iter)
     fixed_watermark = generate_watermark_matrix(BATCH_SIZE, first_batch.size(2), first_batch.size(3)).to(device)
     
-    print("--- Starting Extended Training ---")
+    print("--- Starting Extended Training training_fn_refined ---")
     
     for epoch in range(EPOCHS):
         model.train()
@@ -324,6 +327,7 @@ def training_fn_refined(EPOCHS, model, train_loader, device, criterion, optimize
             torch.save(model.state_dict(), f"revnet_checkpoint_{epoch+1}.pth")
             
 def training_fn_refined_weighted_mse(EPOCHS, model, train_loader, device, criterion, optimizer):
+    # NOTE: THIS FN SAYS WEIGHTED MSE BUT IT IS NOT USED
     # 1. Use MSE for both.
     mse_criterion = criterion    
     
@@ -341,7 +345,7 @@ def training_fn_refined_weighted_mse(EPOCHS, model, train_loader, device, criter
     first_batch = next(data_iter)
     fixed_watermark = generate_watermark_matrix(BATCH_SIZE, first_batch.size(2), first_batch.size(3)).to(device)
     
-    print("--- Starting Extended Training ---")
+    print("--- Starting Extended Training training_fn_refined_weighted_mse ---")
     
     for epoch in range(EPOCHS):
         # Dynamic weighting

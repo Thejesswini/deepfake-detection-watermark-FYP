@@ -252,3 +252,6 @@ def plot_for_one_img(model, test_image_path, device):
     axs[2].axis('off')
 
     plt.show()
+    
+if __name__=='__main__':
+    plot_for_one_img()
