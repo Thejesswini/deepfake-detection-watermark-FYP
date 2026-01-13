@@ -4,16 +4,17 @@ import cv2
 import torch
 from noise import apply_gaussian_noise, apply_jpeg_compression, apply_sharpening
 from .evaluation_metrics import extract_watermark, compare_watermarks
-from revnet_model import RevNet3
+from revnet_model import RevNet3_with_ChannelMixing_Tanh
 import pandas as pd
 from watermark_generation import generate_watermark_matrix
 
-#load images
-def load_images(wmarked_dir="outputs/watermarked"):
+# load images
+def load_images(wmarked_dir="watermarked_RevNet2ChannelMixing_tanh_with_corruptions_dynamic_wimp"):
     """
     takes a folder name, extracts all the images and makes it into [n, 3, h, w] tensor
     """
     tensors = []
+    wmarked_dir = os.path.join(BASE_DIR, "revnet2_ChannelMixing_tanh_with_corruptions_dynamic_wimp", wmarked_dir)
     for fname in os.listdir(wmarked_dir):
         if fname.lower().endswith((".png", ".jpg", ".jpeg")):
             wmk_path = os.path.join(wmarked_dir, fname)
@@ -37,11 +38,13 @@ def load_images(wmarked_dir="outputs/watermarked"):
 if __name__=='__main__':
     # Stack into one tensor: (N, 3, H, W)
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    MODEL_PATH = "model_weights.pth"
+    #MODEL_PATH = r"..\revnet2_ChannelMixing\revnet_checkpoint_100.pth"
+    BASE_DIR = os.path.dirname(os.path.dirname(__file__))  # project/
+    MODEL_PATH = os.path.join(BASE_DIR, "revnet2_ChannelMixing_tanh_with_corruptions_dynamic_wimp", "revnet_checkpoint_100.pth")
     data = {'index':[], 'psnr':[], 'mse':[], 'ssim':[], 'ncc':[]}
     peano_watermark = generate_watermark_matrix(batch_size=1, height=218, width=178)
     
-    model = RevNet3(channels=6).to(DEVICE)
+    model = RevNet3_with_ChannelMixing_Tanh(channels=6).to(DEVICE)
     model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
     model.eval()
     
@@ -49,7 +52,7 @@ if __name__=='__main__':
     print(original_images.shape)
 
     #apply corruption
-    corrupted_images = apply_jpeg_compression(original_images)
+    corrupted_images = apply_sharpening(original_images)
 
     #extract watermark from original and corrupted
     extracted_wm_from_original = extract_watermark(model=model, image_tensor=original_images, DEVICE=DEVICE)
