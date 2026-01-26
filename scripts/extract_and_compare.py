@@ -34,7 +34,7 @@ def preprocess_image(path):
     img = img.unsqueeze(0)
     return img.to(DEVICE)
 
-def extract_watermark(image_tensor):
+def extract_watermark(model, image_tensor, DEVICE):
     """Extract watermark using model inverse"""
     zeros = torch.zeros_like(image_tensor).to(DEVICE)
     input_tensor = torch.cat([image_tensor, zeros], dim=1)
@@ -129,49 +129,61 @@ def compare_watermarks(extracted, original):
     return mse, psnr, ssim_score, ncc
 
 # --------- MAIN LOOP ----------
-data = {'index':[], 'image':[], 'psnr':[], 'mse':[], 'ssim':[], 'ncc':[]}
-ct = 1
-deepfaked = [1, 4, 5, 8, 10, 12, 13, 14, 15, 16, 18, 19, 20, 21, 24, 31,32,34,37,38,42,39,45,46,48,47,49,51,53,56,55,58,60,41,61,62,63,64,65,66]
-deepfaked = ["_"+str(i)+"." for i in deepfaked]
+if __name__=="__main__":
+    watermarked_img = preprocess_image(r"D:\SSN\DEEPFAKE\code\outputs\watermarked\watermarked_54.png")
+    deepfake_img = preprocess_image(r"D:\SSN\DEEPFAKE\code\celebA\img_align_celeba\img_align_celeba\000124.jpg")
+    # Extract watermark from deepfake
+    extracted_wm = extract_watermark(model, deepfake_img, DEVICE)
+    
+    # Watermark from original watermarked image
+    orig_wm = extract_watermark(model, watermarked_img, DEVICE)
+    
+    # Compare
+    mse, psnr, ssim_score, ncc = compare_watermarks(extracted_wm, orig_wm)
+    print(f"MSE={mse:.6f}, PSNR={psnr:.2f} dB")
+    # data = {'index':[], 'image':[], 'psnr':[], 'mse':[], 'ssim':[], 'ncc':[]}
+    # ct = 1
+    # deepfaked = [1, 4, 5, 8, 10, 12, 13, 14, 15, 16, 18, 19, 20, 21, 24, 31,32,34,37,38,42,39,45,46,48,47,49,51,53,56,55,58,60,41,61,62,63,64,65,66]
+    # deepfaked = ["_"+str(i)+"." for i in deepfaked]
 
 
-for fname in os.listdir(WMARKED_DIR):
-    if not any(s in fname for s in deepfaked):
-        wmk_path = os.path.join(WMARKED_DIR, fname)
-        deepfake_path = os.path.join(DEEPFAKE_DIR, fname)
+    # for fname in os.listdir(WMARKED_DIR):
+    #     if not any(s in fname for s in deepfaked):
+    #         wmk_path = os.path.join(WMARKED_DIR, fname)
+    #         deepfake_path = os.path.join(DEEPFAKE_DIR, fname)
 
-        if not os.path.exists(deepfake_path):
-            print(f"Skipping {fname} as deepfake not found")
-            continue
+    #         if not os.path.exists(deepfake_path):
+    #             print(f"Skipping {fname} as deepfake not found")
+    #             continue
 
-        # Load images
-        watermarked_img = preprocess_image(wmk_path)
-        deepfake_img = preprocess_image(deepfake_path)
+    #         # Load images
+    #         watermarked_img = preprocess_image(wmk_path)
+    #         deepfake_img = preprocess_image(deepfake_path)
 
-        # Extract watermark from deepfake
-        extracted_wm = extract_watermark(deepfake_img)
-        
-        # Watermark from original watermarked image
-        orig_wm = extract_watermark(watermarked_img)
-        
-        # Compare
-        mse, psnr, ssim_score, ncc = compare_watermarks(extracted_wm, orig_wm)
-        #print(f"{fname}: MSE={mse:.6f}, PSNR={psnr:.2f} dB")
-        
-        data['index'].append(ct)
-        data['image'].append(fname)
-        data['psnr'].append(psnr)
-        data['mse'].append(mse)
-        data['ssim'].append(ssim_score)
-        data['ncc'].append(ncc)
+    #         # Extract watermark from deepfake
+    #         extracted_wm = extract_watermark(deepfake_img)
+            
+    #         # Watermark from original watermarked image
+    #         orig_wm = extract_watermark(watermarked_img)
+            
+    #         # Compare
+    #         mse, psnr, ssim_score, ncc = compare_watermarks(extracted_wm, orig_wm)
+    #         #print(f"{fname}: MSE={mse:.6f}, PSNR={psnr:.2f} dB")
+            
+    #         data['index'].append(ct)
+    #         data['image'].append(fname)
+    #         data['psnr'].append(psnr)
+    #         data['mse'].append(mse)
+    #         data['ssim'].append(ssim_score)
+    #         data['ncc'].append(ncc)
 
-        # Save extracted watermark
-        save_path = os.path.join(OUT_DIR, f"{fname}_wm.png")
-        save_image(extracted_wm, save_path)
-        print(f"Saved extracted watermark: {save_path}")
-        ct+=1
+    #         # Save extracted watermark
+    #         save_path = os.path.join(OUT_DIR, f"{fname}_wm.png")
+    #         save_image(extracted_wm, save_path)
+    #         print(f"Saved extracted watermark: {save_path}")
+    #         ct+=1
 
-df = pd.DataFrame(data)
-print(df.describe())
-# df.to_csv('remaker_66_s-wm_t-wm.csv')
-# print('saved')
+    # df = pd.DataFrame(data)
+    # print(df.describe())
+    # df.to_csv('remaker_66_s-wm_t-wm.csv')
+    # print('saved')

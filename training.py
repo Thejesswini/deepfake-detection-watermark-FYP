@@ -109,7 +109,7 @@ train_loader, val_loader, test_loader = get_data_loaders(
     image_directory=r'D:\SSN\DEEPFAKE\code\celebA\img_align_celeba\img_align_celeba',
     total_num=200,
     train_per=0.8,
-    val_per=0.1,
+    val_per=0.2,
     shuffle=False
 )
 
@@ -146,7 +146,7 @@ model.eval()
 print("Training complete.")
 
 # Evaluate
-#evaluate_model(model=model, device=device, val_loader=val_loader)
+evaluate_model(model=model, device=device, val_loader=val_loader)
 
 # Show & save watermarked results
-show_and_save_watermarking_results(model, train_loader, device, num_images=6, start=130)
+#show_and_save_watermarking_results(model, train_loader, device, num_images=6, start=130)
