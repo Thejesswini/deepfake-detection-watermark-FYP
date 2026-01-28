@@ -108,15 +108,15 @@ def robust_peano_matrix(peano_matrix):
     normalized = peano_matrix / peano_matrix.max()
     
     # Bucketize into discrete integer levels (0, 1, 2 ... 15)
-    #stepped = np.floor(normalized * num_levels)
+    stepped = np.floor(normalized * num_levels)
     
     # 4. Scale to 0-1 range for the Tensor
     # (The model likes 0.0 - 1.0 floats)
     # The actual values will be: 0.0, 0.066, 0.133... 1.0
-    #final_matrix = stepped / (num_levels - 1)
+    final_matrix = stepped / (num_levels - 1)
     
-    #return final_matrix
-    return normalized
+    return final_matrix
+    #return normalized
 
 def generate_watermark_matrix(batch_size, height, width, order=3):
     peano_matrix = peano_curve_generator(height, width, order)
