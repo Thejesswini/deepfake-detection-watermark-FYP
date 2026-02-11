@@ -14,24 +14,30 @@ ct=0
 # print(ct)
 
 
-folder_path = r"./only_watermarked"
+from revnet_model import RevNet3
+from watermark_generation import generate_watermark_matrix
+import torch
+import torch.nn.functional as F
+from torchvision import utils
+from torchvision.io import read_image
 
-# Get all png files
-files = [f for f in os.listdir(folder_path) if f.lower().endswith(".png")]
+path1 = r"C:\Users\theju\Downloads\varied_bg.jpg"
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Function to extract number from filename
-def extract_number(filename):
-    match = re.search(r'(\d+)', filename)
-    return int(match.group(1)) if match else float('inf')
+img1 = read_image(path1).float() / 255.0
+img1 = img1.unsqueeze(0)
+img1.to(DEVICE)
+    
+model = RevNet3(channels=6).to(DEVICE)
+model.load_state_dict(torch.load("model_weights.pth", map_location=DEVICE))
+model.eval()
 
-# Sort files by extracted number
-files.sort(key=extract_number)
+og_peano_curve = generate_watermark_matrix(batch_size=1, height=218, width=178)
+input_tensor = torch.cat([img1, og_peano_curve], dim=1)
+print(input_tensor.shape)
 
-# Rename files
-for idx, filename in enumerate(files, start=1):
-    new_name = f"watermarked_{idx:04d}.png"  # 0001.png format
-    old_path = os.path.join(folder_path, filename)
-    new_path = os.path.join(folder_path, new_name)
-    os.rename(old_path, new_path)
-
-print("Renaming completed.")
+with torch.no_grad():
+    embedded = model(input_tensor)
+    embedded_image, embedded_watermark_part = torch.chunk(embedded, 2, dim=1)
+utils.save_image(embedded_image, "varied_bg.jpg")
+print('done')
