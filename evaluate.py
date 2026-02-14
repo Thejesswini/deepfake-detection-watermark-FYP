@@ -4,7 +4,7 @@ import torch
 from watermark_generation import generate_watermark_matrix
 from noise import apply_corruptions
 import torch.nn as nn
-
+from sha_verify import verify_sha
 def evaluate_model(model, val_loader, device):
     """
     Evaluates the RevNet model on the validation set.
@@ -41,6 +41,7 @@ def evaluate_model(model, val_loader, device):
             embedded = model(input_tensor)
             embedded_image, embedded_watermark_part = torch.chunk(embedded, 2, dim=1)
             
+            
             # Update PSNR and SSIM totals
             cur_psnr = psnr_metric(embedded_image, images)
             cur_ssim = ssim_metric(embedded_image, images)
@@ -54,6 +55,18 @@ def evaluate_model(model, val_loader, device):
             
             recovered = model.inverse(corrupted_input_for_inverse)
             _, recovered_watermark = torch.chunk(recovered, 2, dim=1)
+            
+            mse_sha = verify_sha(recovered_watermark, recovered_watermark.size(0),
+                     recovered_watermark.size(2),
+                     recovered_watermark.size(3),
+                     )
+
+            print("SHA integrity error:", mse_sha)
+
+            if mse_sha > 0.01:
+                print("Deepfake / Tampering detected!")
+            else:
+                print("Authentic image.")
 
             # Calculate and update watermark recovery MSE
             watermark_mse = extraction_metric(recovered_watermark, watermarks)

@@ -70,6 +70,7 @@ def generate_watermark_matrix(batch_size, side):
 
 import numpy as np
 import torch
+from sha_watermark import generate_sha_matrix
 
 def peano_curve_generator(height, width, order=3):
     mat = np.zeros((height, width), dtype=np.int64)
@@ -98,10 +99,18 @@ def peano_curve_generator(height, width, order=3):
     return mat
 
 
-def generate_watermark_matrix(batch_size, height, width, order=3):
+def generate_watermark_matrix(batch_size, height, width, order=3, image_id="default"):
+    # ----- Peano watermark -----
     peano_matrix = peano_curve_generator(height, width, order)
     peano_norm = peano_matrix.astype(np.float32) / peano_matrix.max()
 
-    peano_tensor = torch.tensor(peano_norm).unsqueeze(0).repeat(batch_size, 1, 1, 1)  # [B,1,H,W]
-    peano_tensor_3c = peano_tensor.repeat(1, 3, 1, 1)  # [B,3,H,W]
-    return peano_tensor_3c
+    peano_tensor = torch.tensor(peano_norm).unsqueeze(0).unsqueeze(0)
+    peano_tensor = peano_tensor.repeat(batch_size, 3, 1, 1)
+
+    # ----- SHA watermark -----
+    sha_tensor = generate_sha_matrix(batch_size, height, width, image_id)
+
+    # ----- FINAL WATERMARK = Peano × SHA -----
+    final_watermark = peano_tensor * sha_tensor
+
+    return final_watermark
