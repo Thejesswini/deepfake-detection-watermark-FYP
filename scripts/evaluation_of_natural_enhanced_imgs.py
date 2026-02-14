@@ -9,7 +9,7 @@ import pandas as pd
 from watermark_generation import generate_watermark_matrix
 
 # load images
-def load_images(wmarked_dir=r"outputs\watermarked"):
+def load_images(wmarked_dir=r"only_watermarked"):
     """
     takes a folder name, extracts all the images and makes it into [n, 3, h, w] tensor
     """
@@ -52,7 +52,7 @@ if __name__=='__main__':
     print(original_images.shape)
 
     #apply corruption
-    corrupted_images = apply_gaussian_noise(original_images)
+    corrupted_images = load_images("only_deepfakes")
 
     #extract watermark from original and corrupted
     extracted_wm_from_original = extract_watermark(model=model, image_tensor=original_images, DEVICE=DEVICE)
@@ -75,7 +75,7 @@ if __name__=='__main__':
 
 
     #compare using metrics
-df = pd.DataFrame(data)
-print(df.describe())
+    df = pd.DataFrame(data)
+    print(df.describe())
 # df.to_csv('img_enhancements_66.csv')
 # print('saved')

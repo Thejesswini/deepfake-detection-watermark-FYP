@@ -4,6 +4,7 @@ import numpy as np
 from skimage.metrics import structural_similarity as ssim
 from revnet_model import RevNet3
 from watermark_generation import generate_watermark_matrix
+import os
 
 def extract_watermark(model, image_tensor, DEVICE):
     """Extract watermark using model inverse"""
@@ -105,33 +106,52 @@ def compare_watermarks(extracted, original):
     
     return mse, psnr, ssim_score, ncc
 
-if __name__=='__main__':
-    from torchvision.io import read_image
-    path1 = r"D:\SSN\DEEPFAKE\code\varied_bg.jpg"
-    path2 = r"c:\Users\theju\Downloads\varied_bg_deepfaked.png"
-    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    img1 = read_image(path1).float() / 255.0
+def get_img_list(path):
+    files = []
+    for fname in os.listdir(path):    
+        files.append(fname)
+        
+def convert_img_path_to_tensor(base_dir, path):
+    path = os.path.join(base_dir, path)
+    img1 = read_image(path).float() / 255.0
     img1 = img1.unsqueeze(0)
     img1.to(DEVICE)
+    return img1
     
-    from PIL import Image
-    from torchvision import transforms
-
-    img2 = Image.open(path2).convert("RGB")
-    transform = transforms.ToTensor()
-    img2 = transform(img2)
-    img2 = img2.unsqueeze(0)
-    img2.to(DEVICE)
+if __name__=='__main__':
+    from torchvision.io import read_image
+    path1 = r".\only_watermarked"
+    path2 = r".\only_deepfakes"
+    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     model = RevNet3(channels=6).to(DEVICE)
     model.load_state_dict(torch.load("model_weights.pth", map_location=DEVICE))
     model.eval()
     
-    wm1 = extract_watermark(model, img1, DEVICE)
-    wm2 = extract_watermark(model, img2, DEVICE)
+    watermarked = get_img_list(path1)
+    deepfaked = get_img_list(path2)
+    for w,d in zip(watermarked, deepfaked):
+        w_tensor = convert_img_path_to_tensor(path1, w)
+        d_tensor = convert_img_path_to_tensor(path2, d)
+        
+        wm1 = extract_watermark(model, w_tensor, DEVICE)
+        wm2 = extract_watermark(model, d_tensor, DEVICE)
+        mse, psnr, ssim_, ncc = compare_watermarks(wm2, wm1)
+        print(f"MSE: {mse:.4f}; PSNR: {psnr:.4f}dB; SSIM: {ssim_:.4f}; NCC: {ncc:.4f}")
+    
+    
+    
+    # from PIL import Image
+    # from torchvision import transforms
+
+    # img2 = Image.open(path2).convert("RGB")
+    # transform = transforms.ToTensor()
+    # img2 = transform(img2)
+    # img2 = img2.unsqueeze(0)
+    # img2.to(DEVICE)
+    
+    
     # print(img2.shape)
     # og_peano_curve = generate_watermark_matrix(batch_size=1, height=218, width=178)
     
-    mse, psnr, ssim_, ncc = compare_watermarks(wm2, wm1)
-    print(f"MSE: {mse:.4f}; PSNR: {psnr:.4f}dB; SSIM: {ssim_:.4f}; NCC: {ncc:.4f}")
     
