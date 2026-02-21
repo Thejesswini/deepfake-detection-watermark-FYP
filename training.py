@@ -16,7 +16,7 @@ from config import EPOCHS
 from torchmetrics.image import PeakSignalNoiseRatio
 
 
-def show_and_save_watermarking_results(model, loader, device, num_images=30, save_dir="outputs/watermarked", start=0):
+def show_and_save_watermarking_results(model, loader, device, num_images=30, save_dir="only_watermarked", start=0):
     """
     Visualizes and saves original, watermarked, and corrupted images side-by-side.
 
@@ -86,30 +86,33 @@ def show_and_save_watermarking_results(model, loader, device, num_images=30, sav
 
       # ----- Save only watermarked images -----
     for idx, img in enumerate(embedded_images):
-        save_path = os.path.join(save_dir, f"watermarked_{idx+61}.png")
+        save_path = os.path.join(save_dir, f"watermarked_00{idx+76}.png")
         utils.save_image(img, save_path)
         print(f"Saved: {save_path}")
 
     # ----- Visualize all images in a grid -----
+    
     all_images = torch.cat([original_images, embedded_images, corrupted_images], dim=0)
     grid = utils.make_grid(all_images, nrow=NUM_IMAGES, padding=2, normalize=False)
-
+'''
     plt.figure(figsize=(15, 6))
     np_grid = grid.cpu().numpy()
     plt.imshow(np.transpose(np_grid, (1, 2, 0)))
     plt.title('Top: Original | Middle: Watermarked | Bottom: Corrupted', fontsize=16)
     plt.axis('off')
     plt.show()
+'''
+
 
 
 # ================== MAIN TRAINING ==================
 
 # Load dataset
 train_loader, val_loader, test_loader = get_data_loaders(
-    image_directory=r'D:\SSN\DEEPFAKE\code\celebA\img_align_celeba\img_align_celeba',
-    total_num=200,
-    train_per=0.8,
-    val_per=0.2,
+    image_directory=r'/Users/sem5/sem7/deepfake/celebA/img_align_celeba/img_align_celeba',
+    total_num=500,
+    train_per=1,
+    val_per=0,
     shuffle=False
 )
 
@@ -146,7 +149,7 @@ model.eval()
 print("Training complete.")
 
 # Evaluate
-evaluate_model(model=model, device=device, val_loader=val_loader)
+#evaluate_model(model=model, device=device, val_loader=val_loader)
 
 # Show & save watermarked results
-#show_and_save_watermarking_results(model, train_loader, device, num_images=6, start=130)
+show_and_save_watermarking_results(model, train_loader, device, num_images=25, start=450)
