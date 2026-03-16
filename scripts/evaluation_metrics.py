@@ -5,6 +5,7 @@ from skimage.metrics import structural_similarity as ssim
 from revnet_model import RevNet3
 from watermark_generation import generate_watermark_matrix
 import os
+from torchvision.io import read_image
 
 def extract_watermark(model, image_tensor, DEVICE):
     """Extract watermark using model inverse"""
@@ -111,18 +112,18 @@ def get_img_list(path):
     for fname in os.listdir(path):    
         files.append(fname)
         
-def convert_img_path_to_tensor(base_dir, path):
+def convert_img_path_to_tensor(base_dir, path, device):
     path = os.path.join(base_dir, path)
     img1 = read_image(path).float() / 255.0
     img1 = img1.unsqueeze(0)
-    img1.to(DEVICE)
+    img1.to(device)
     return img1
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
 if __name__=='__main__':
-    from torchvision.io import read_image
+    
     path1 = r".\only_watermarked"
     path2 = r".\only_deepfakes"
-    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     model = RevNet3(channels=6).to(DEVICE)
     model.load_state_dict(torch.load("model_weights.pth", map_location=DEVICE))

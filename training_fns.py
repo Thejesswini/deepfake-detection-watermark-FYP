@@ -3,7 +3,6 @@ from watermark_generation import generate_watermark_matrix
 from noise import apply_corruptions
 from config import W_EXTRACTION, W_IMPERCEPTIBILITY, BATCH_SIZE
 
-# NOTE: CHANGE THE WAY LOSS IS PRINTED DURING TRAINING!!!
 
 def training_fn_standard(EPOCHS, model, train_loader, device, criterion1, criterion2, optimizer):
     """
@@ -22,13 +21,8 @@ def training_fn_standard(EPOCHS, model, train_loader, device, criterion1, criter
         model.train()
         for batch_idx, images in enumerate(train_loader):
             images = images.to(device)
-            #print("images shape", images.shape)
-            
-            #print("watermark shape:", watermarks.shape)
             
             input_tensor = torch.cat([images, watermarks], dim=1)
-            #print("ip tensor shape:", input_tensor.shape)
-
             
             embedded = model(input_tensor)
             embedded_image, embedded_watermark_part = torch.chunk(embedded, 2, dim=1)
@@ -73,14 +67,8 @@ def training_fn_set_trnfrmd_wtmk_2_0(EPOCHS, model, train_loader, device, criter
         model.train()
         for batch_idx, images in enumerate(train_loader):
             images = images.to(device)
-            #print("images shape", images.shape)
-            
-            
-            #print("watermark shape:", watermarks.shape)
             
             input_tensor = torch.cat([images, watermarks], dim=1)
-            #print("ip tensor shape:", input_tensor.shape)
-
             
             embedded = model(input_tensor)
             embedded_image, embedded_watermark_part = torch.chunk(embedded, 2, dim=1)

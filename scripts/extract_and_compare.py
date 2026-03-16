@@ -7,23 +7,6 @@ from revnet_model import RevNet3
 import torch.nn.functional as F
 import numpy as np
 
-# --------- CONFIG ----------
-WMARKED_DIR = "only_watermarked"     # your saved watermarked images
-DEEPFAKE_DIR = "only_deepfakes"             # deepfake images
-OUT_DIR = "outputs/extracted_watermarks/deepfake"
-OUT_DI="outputs/extracted_watermarks/original"
-MODEL_PATH = "model_weights.pth"
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-IMAGE_SIZE = (218, 178)
-
-os.makedirs(OUT_DIR, exist_ok=True)
-os.makedirs(OUT_DI, exist_ok=True)
-
-# --------- MODEL ----------
-model = RevNet3(channels=6).to(DEVICE)
-model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
-model.eval()
-
 # --------- FUNCTIONS ----------
 from PIL import Image
 import torchvision.transforms as transforms
@@ -58,41 +41,59 @@ def compare_watermarks(extracted, original):
     return mse, psnr
 
 # --------- MAIN LOOP ----------
-import os
+if __name__=='__main__':
+    # --------- CONFIG ----------
+    WMARKED_DIR = "only_watermarked"     # your saved watermarked images
+    DEEPFAKE_DIR = "only_deepfakes"             # deepfake images
+    OUT_DIR = "outputs/extracted_watermarks/deepfake"
+    OUT_DI="outputs/extracted_watermarks/original"
+    MODEL_PATH = "model_weights.pth"
+    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    IMAGE_SIZE = (218, 178)
 
-valid_extensions = ('.png', '.jpg', '.jpeg')
+    os.makedirs(OUT_DIR, exist_ok=True)
+    os.makedirs(OUT_DI, exist_ok=True)
 
-for fname in os.listdir(WMARKED_DIR):
-    if fname.lower().endswith(valid_extensions):
-        wmk_path = os.path.join(WMARKED_DIR, fname)
-        deepfake_name = fname.replace("watermarked", "deepfake")
-        deepfake_path = os.path.join(DEEPFAKE_DIR, deepfake_name)
-        #deepfake_path = os.path.join(DEEPFAKE_DIR, fname)
-        
-        if not os.path.exists(deepfake_path):
-            print(f"Skipping {fname} as deepfake not found")
-            continue
+    # --------- MODEL ----------
+    model = RevNet3(channels=6).to(DEVICE)
+    model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
+    model.eval()
 
-        # Load images
-        watermarked_img = preprocess_image(wmk_path)
-        deepfake_img = preprocess_image(deepfake_path)
+    import os
 
-        # Extract watermark from deepfake
-        extracted_wm = extract_watermark(deepfake_img)
+    valid_extensions = ('.png', '.jpg', '.jpeg')
 
-        # Watermark from original watermarked image
-        orig_wm = extract_watermark(watermarked_img)
+    for fname in os.listdir(WMARKED_DIR):
+        if fname.lower().endswith(valid_extensions):
+            wmk_path = os.path.join(WMARKED_DIR, fname)
+            deepfake_name = fname.replace("watermarked", "deepfake")
+            deepfake_path = os.path.join(DEEPFAKE_DIR, deepfake_name)
+            #deepfake_path = os.path.join(DEEPFAKE_DIR, fname)
+            
+            if not os.path.exists(deepfake_path):
+                print(f"Skipping {fname} as deepfake not found")
+                continue
 
-        # Compare
-        mse, psnr = compare_watermarks(extracted_wm, orig_wm)
-        print(f"{fname}: MSE={mse:.6f}, PSNR={psnr:.2f} dB")
+            # Load images
+            watermarked_img = preprocess_image(wmk_path)
+            deepfake_img = preprocess_image(deepfake_path)
 
-        # Save extracted watermark -  deepfakes 
-        save_path = os.path.join(OUT_DIR, f"{fname}_wm.png")
-        save_image(extracted_wm, save_path)
-        print(f"Saved extracted watermark deepfake : {save_path}")
-        
-        # Save extracted watermark - orignal
-        save_path = os.path.join(OUT_DI, f"{fname}_wm.png")
-        save_image(orig_wm, save_path)
-        print(f"Saved extracted watermark original: {save_path}")
+            # Extract watermark from deepfake
+            extracted_wm = extract_watermark(deepfake_img)
+
+            # Watermark from original watermarked image
+            orig_wm = extract_watermark(watermarked_img)
+
+            # Compare
+            mse, psnr = compare_watermarks(extracted_wm, orig_wm)
+            print(f"{fname}: MSE={mse:.6f}, PSNR={psnr:.2f} dB")
+
+            # Save extracted watermark -  deepfakes 
+            save_path = os.path.join(OUT_DIR, f"{fname}_wm.png")
+            save_image(extracted_wm, save_path)
+            print(f"Saved extracted watermark deepfake : {save_path}")
+            
+            # Save extracted watermark - orignal
+            save_path = os.path.join(OUT_DI, f"{fname}_wm.png")
+            save_image(orig_wm, save_path)
+            print(f"Saved extracted watermark original: {save_path}")

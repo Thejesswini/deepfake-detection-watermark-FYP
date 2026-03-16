@@ -38,7 +38,6 @@ def load_images(wmarked_dir=r"only_watermarked_2_noises"):
 if __name__=='__main__':
     # Stack into one tensor: (N, 3, H, W)
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    #MODEL_PATH = r"..\revnet2_ChannelMixing\revnet_checkpoint_100.pth"
     BASE_DIR = os.path.dirname(os.path.dirname(__file__))  # project/
     MODEL_PATH = os.path.join(BASE_DIR, "model_weights_2_noises.pth")
     data = {'index':[], 'psnr':[], 'mse':[], 'ssim':[], 'ncc':[]}
@@ -77,5 +76,3 @@ if __name__=='__main__':
     #compare using metrics
     df = pd.DataFrame(data)
     print(df.describe())
-# df.to_csv('img_enhancements_66.csv')
-# print('saved')
